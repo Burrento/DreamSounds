@@ -30,7 +30,7 @@ Two files hold nearly everything:
 - `event_date` / `event_time` are stored as the strings the form sends, not `DATE`/`TIME`; `created_at` comes back as an ISO timestamp.
 - Startup seeding is one-shot: the admin user is created only if `ADMIN_EMAIL` has no row, and starter equipment only if the table is empty. Changing `ADMIN_PASSWORD` in `.env` afterwards does not change the existing admin's password.
 - `bookings.items_json` is a JSON string of `{id, name}` snapshots, parsed only in the admin listing.
-- Equipment `DELETE` is a soft delete (`active=0`); the public `/api/equipment` filters on `active=1`. Portfolio `DELETE` is a hard delete and also unlinks the file.
+- Equipment has no admin UI or write routes: the catalogue is the startup seed, and the public `/api/equipment` lists rows with `active=1`. Change it in the database. Portfolio `DELETE` is a hard delete and also unlinks the file.
 
 ### Auth
 
@@ -43,7 +43,7 @@ Two files hold nearly everything:
 
 - `api()` in `app.js` is the single fetch wrapper (adds the token, sets JSON content type unless the body is `FormData`, throws `Error(data.error)` on non-2xx). The server always reports failures as `{ error: "..." }`.
 - All rendering is template strings assigned to `innerHTML`. Every server- or user-supplied value must go through `esc()`.
-- Admin panels are re-rendered wholesale and re-bind their own listeners after each mutation, then call the public loaders (`loadEquipment`, `loadPortfolio`) to keep the page behind the modal in sync.
+- Admin panels are re-rendered wholesale and re-bind their own listeners after each mutation, then call the public loader (`loadPortfolio`) to keep the page behind the modal in sync.
 
 ### Things that are duplicated and must be changed together
 

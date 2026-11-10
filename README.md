@@ -1,6 +1,6 @@
 # DreamSounds Official Website
 
-A responsive red, black and white website with a Node.js/MySQL backend, quotation requests, an admin dashboard, equipment catalogue management and portfolio image uploads.
+A responsive red, black and white website with a Node.js/MySQL backend, quotation requests, an admin dashboard and portfolio image uploads.
 
 ## Included
 
@@ -11,7 +11,7 @@ A responsive red, black and white website with a Node.js/MySQL backend, quotatio
 - Admin-only login
 - Admin overview dashboard
 - Inquiry management: status, quoted amount and internal notes
-- Equipment and service catalogue management (add, edit, hide, show)
+- Public equipment and service catalogue (seeded on first start; there is no admin screen for it)
 - Multi-image portfolio uploads and deletion
 - MySQL database (created automatically on first start)
 - Image files stored in `uploads/`
@@ -73,6 +73,6 @@ This project is a working starter application, not yet a hosted live website. Be
 
 The provided DreamSounds logo is copied to `public/logo.jpeg`. The website uses the official red, black and white palette and the tagline:
 
-**The Sound Quality. The Light of Excellence.**
+**The Sound of Quality. The Light of Excellence.**
 
 No stock or generated event photography is included. Upload actual DreamSounds photos in Admin Dashboard → Portfolio Uploads.

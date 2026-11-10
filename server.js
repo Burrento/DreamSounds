@@ -11,6 +11,9 @@ const path = require("path");
 const fs = require("fs");
 
 const app = express();
+// Behind a local tunnel or reverse proxy every visitor arrives from 127.0.0.1; without this
+// the rate limits would count all of them as one person.
+app.set("trust proxy", "loopback");
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -187,7 +190,7 @@ app.post("/api/bookings", bookingLimiter, h(async (req,res) => {
     `Reference number: ${ref}`, "",
     "Our team will review your event details and get back to you. To add anything, just reply to this email and mention your reference number.", "",
     "If you did not send this request, you can ignore this email.", "",
-    "DreamSounds Audio and Lighting Rentals", "The Sound Quality. The Light of Excellence."
+    "DreamSounds Audio and Lighting Rentals", "The Sound of Quality. The Light of Excellence."
   ].join("\n"));
   res.status(201).json({message:"Your quotation request has been received. Our team will review your event details.",reference:ref});
 }));
@@ -199,7 +202,6 @@ app.get("/api/admin/overview", requireAuth, requireAdmin, h(async (_req,res) => 
   res.json({
     inquiries:await count("bookings"),
     newInquiries:await count("bookings","WHERE status='New'"),
-    equipment:await count("equipment","WHERE active=1"),
     portfolio:await count("portfolio")
   });
 }));
@@ -225,23 +227,6 @@ app.patch("/api/admin/bookings/:id", requireAuth, requireAdmin, h(async (req,res
   const result=await q(`UPDATE bookings SET ${sets.join(",")} WHERE id=?`,[...vals,req.params.id]);
   if (!result.affectedRows) return res.status(404).json({error:"Booking not found."});
   res.json({ok:true});
-}));
-app.get("/api/admin/equipment", requireAuth, requireAdmin, h(async (_req,res) => res.json(await q("SELECT * FROM equipment ORDER BY category,name"))));
-app.post("/api/admin/equipment", requireAuth, requireAdmin, h(async (req,res) => {
-  const {name,category,description,quantity,daily_rate}=req.body||{};
-  if (!clean(name)||!clean(category)) return res.status(400).json({error:"Equipment name and category are required."});
-  const r=await q("INSERT INTO equipment (name,category,description,quantity,daily_rate) VALUES (?,?,?,?,?)",[clean(name),clean(category),clean(description),Math.max(0,Number(quantity)||0),Math.max(0,Number(daily_rate)||0)]);
-  res.status(201).json({id:r.insertId});
-}));
-app.patch("/api/admin/equipment/:id", requireAuth, requireAdmin, h(async (req,res) => {
-  const {name,category,description,quantity,daily_rate,active}=req.body||{};
-  const r=await q("UPDATE equipment SET name=?,category=?,description=?,quantity=?,daily_rate=?,active=? WHERE id=?",
-    [clean(name),clean(category),clean(description),Math.max(0,Number(quantity)||0),Math.max(0,Number(daily_rate)||0),active?1:0,req.params.id]);
-  if (!r.affectedRows) return res.status(404).json({error:"Equipment not found."});
-  res.json({ok:true});
-}));
-app.delete("/api/admin/equipment/:id", requireAuth, requireAdmin, h(async (req,res) => {
-  await q("UPDATE equipment SET active=0 WHERE id=?",[req.params.id]); res.json({ok:true});
 }));
 app.post("/api/admin/portfolio", requireAuth, requireAdmin, upload.array("images",12), h(async (req,res) => {
   const title=clean(req.body.title), category=clean(req.body.category), description=clean(req.body.description);
