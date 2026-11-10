@@ -135,37 +135,25 @@ const clean = v => String(v ?? "").trim();
 const validEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 const reference = id => `DS-${String(id).padStart(5,"0")}`;
 
-// Inquiry emails go to the team only. Off unless SMTP_HOST and BUSINESS_EMAIL are set.
+// Each request emails the team and sends the client a confirmation. Off unless SMTP_HOST and BUSINESS_EMAIL are set.
 const smtpPort = Number(process.env.SMTP_PORT) || 587;
 const mailer = process.env.SMTP_HOST && process.env.BUSINESS_EMAIL ? nodemailer.createTransport({
   host: process.env.SMTP_HOST, port: smtpPort, secure: smtpPort === 465,
   auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined
 }) : null;
 // Not awaited: a mail failure must never fail the customer's request.
-function notifyTeam(subject, text, replyTo) {
+function sendMail(to, replyTo, subject, text) {
   if (!mailer) return;
-  mailer.sendMail({ from: process.env.SMTP_FROM || process.env.SMTP_USER, to: process.env.BUSINESS_EMAIL, replyTo, subject, text })
+  mailer.sendMail({ from: process.env.SMTP_FROM || process.env.SMTP_USER, to, replyTo, subject, text })
     .catch(err => console.error("Email notification failed:", err.message));
 }
 
 app.get("/api/health", (_req,res) => res.json({ ok: true, service: "DreamSounds website" }));
 
-app.post("/api/auth/register", authLimiter, h(async (req,res) => {
-  const name=clean(req.body.name), email=clean(req.body.email).toLowerCase(), phone=clean(req.body.phone), password=String(req.body.password||"");
-  if (!name || !validEmail(email) || password.length < 8) return res.status(400).json({error:"Enter your name, a valid email, and a password with at least 8 characters."});
-  try {
-    const hash=bcrypt.hashSync(password,12);
-    const result=await q("INSERT INTO users (name,email,phone,password_hash) VALUES (?,?,?,?)",[name,email,phone,hash]);
-    const user={id:result.insertId,name,email,phone,role:"customer"};
-    res.status(201).json({token:tokenFor(user),user});
-  } catch (err) {
-    if (err.code !== "ER_DUP_ENTRY") throw err;
-    res.status(409).json({error:"An account with this email already exists."});
-  }
-}));
+// Staff only: there is no registration, and accounts are created by the startup seed.
 app.post("/api/auth/login", authLimiter, h(async (req,res) => {
   const email=clean(req.body.email).toLowerCase(), password=String(req.body.password||"");
-  const [user]=await q("SELECT * FROM users WHERE email=?",[email]);
+  const [user]=await q("SELECT * FROM users WHERE email=? AND role='admin'",[email]);
   if (!user || !bcrypt.compareSync(password,user.password_hash)) return res.status(401).json({error:"Incorrect email or password."});
   res.json({token:tokenFor(user),user:{id:user.id,name:user.name,email:user.email,phone:user.phone,role:user.role}});
 }));
@@ -176,32 +164,32 @@ app.get("/api/auth/me", requireAuth, h(async (req,res) => {
 }));
 
 app.get("/api/equipment", h(async (_req,res) => res.json(await q("SELECT id,name,category,description,quantity,daily_rate FROM equipment WHERE active=1 ORDER BY category,name"))));
-app.post("/api/bookings", h(async (req,res) => {
+// The form is public and emails whatever address is typed in, so cap how fast one visitor can submit.
+const bookingLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: "draft-7", legacyHeaders: false,
+  message: { error: "Too many requests from this device. Please try again in a few minutes." } });
+app.post("/api/bookings", bookingLimiter, h(async (req,res) => {
   const b=req.body||{};
   const required=["customer_name","email","phone","event_name","event_date","venue"];
   if (required.some(k=>!clean(b[k])) || !validEmail(clean(b.email))) return res.status(400).json({error:"Please complete all required fields with a valid email."});
   const items=Array.isArray(b.items) ? b.items.slice(0,30).map(x=>({id:Number(x.id),name:clean(x.name)})) : [];
-  const userId = (()=>{ try { const raw=(req.headers.authorization||"").replace(/^Bearer\s+/i,""); return raw ? jwt.verify(raw,JWT_SECRET).id : null; } catch { return null; }})();
-  const result=await q(`INSERT INTO bookings (user_id,customer_name,email,phone,event_name,event_date,event_time,venue,guest_count,notes,items_json)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?)`,[userId,clean(b.customer_name),clean(b.email),clean(b.phone),clean(b.event_name),clean(b.event_date),clean(b.event_time),clean(b.venue),Math.max(0,Number(b.guest_count)||0),clean(b.notes),JSON.stringify(items)]);
+  const result=await q(`INSERT INTO bookings (customer_name,email,phone,event_name,event_date,event_time,venue,guest_count,notes,items_json)
+    VALUES (?,?,?,?,?,?,?,?,?,?)`,[clean(b.customer_name),clean(b.email),clean(b.phone),clean(b.event_name),clean(b.event_date),clean(b.event_time),clean(b.venue),Math.max(0,Number(b.guest_count)||0),clean(b.notes),JSON.stringify(items)]);
   const ref=reference(result.insertId);
-  notifyTeam(`New quotation request ${ref}: ${clean(b.event_name)}`, [
+  sendMail(process.env.BUSINESS_EMAIL, clean(b.email), `New quotation request ${ref}: ${clean(b.event_name)}`, [
     `Reference: ${ref}`, `Customer: ${clean(b.customer_name)}`, `Email: ${clean(b.email)}`, `Phone: ${clean(b.phone)}`,
     `Event: ${clean(b.event_name)}`, `Date: ${clean(b.event_date)} ${clean(b.event_time)}`, `Venue: ${clean(b.venue)}`,
     `Guests: ${Math.max(0,Number(b.guest_count)||0)}`, `Requested: ${items.map(x=>x.name).join(", ")||"Not specified"}`, "", clean(b.notes)
-  ].join("\n"), clean(b.email));
+  ].join("\n"));
+  // Deliberately contains nothing the visitor typed: the address is unverified, so the form
+  // must not be usable to send someone else a message of the sender's choosing.
+  sendMail(clean(b.email), process.env.BUSINESS_EMAIL, `We received your quotation request ${ref}`, [
+    "Hello,", "", "Thank you for contacting DreamSounds Audio and Lighting Rentals. We have received your quotation request.", "",
+    `Reference number: ${ref}`, "",
+    "Our team will review your event details and get back to you. To add anything, just reply to this email and mention your reference number.", "",
+    "If you did not send this request, you can ignore this email.", "",
+    "DreamSounds Audio and Lighting Rentals", "The Sound Quality. The Light of Excellence."
+  ].join("\n"));
   res.status(201).json({message:"Your quotation request has been received. Our team will review your event details.",reference:ref});
-}));
-app.get("/api/bookings/mine", requireAuth, h(async (req,res) => {
-  const rows=await q("SELECT id,event_name,event_date,event_time,venue,guest_count,notes,items_json,status,quoted_amount,created_at FROM bookings WHERE user_id=? ORDER BY id DESC",[req.user.id]);
-  res.json(rows.map(({items_json,...b})=>({...b,reference:reference(b.id),items:JSON.parse(items_json||"[]")})));
-}));
-app.post("/api/bookings/:id/cancel", requireAuth, h(async (req,res) => {
-  // Confirmed bookings are deliberately excluded: those need a conversation with the team.
-  const r=await q("UPDATE bookings SET status='Cancelled' WHERE id=? AND user_id=? AND status IN ('New','Reviewing','Quoted')",[req.params.id,req.user.id]);
-  if (!r.affectedRows) return res.status(400).json({error:"This request can no longer be cancelled online. Please contact DreamSounds."});
-  notifyTeam(`Request ${reference(req.params.id)} cancelled by customer`, `${req.user.email} cancelled request ${reference(req.params.id)}.`);
-  res.json({ok:true});
 }));
 
 app.get("/api/portfolio", h(async (_req,res) => res.json(await q("SELECT id,title,category,description,image_path,featured,created_at FROM portfolio ORDER BY featured DESC,id DESC"))));
@@ -211,7 +199,6 @@ app.get("/api/admin/overview", requireAuth, requireAdmin, h(async (_req,res) => 
   res.json({
     inquiries:await count("bookings"),
     newInquiries:await count("bookings","WHERE status='New'"),
-    customers:await count("users","WHERE role='customer'"),
     equipment:await count("equipment","WHERE active=1"),
     portfolio:await count("portfolio")
   });

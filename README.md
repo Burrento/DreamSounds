@@ -1,15 +1,14 @@
 # DreamSounds Official Website
 
-A responsive red, black and white website with a Node.js/MySQL backend, customer accounts, quotation requests, an admin dashboard, equipment catalogue management and portfolio image uploads.
+A responsive red, black and white website with a Node.js/MySQL backend, quotation requests, an admin dashboard, equipment catalogue management and portfolio image uploads.
 
 ## Included
 
 - Public company website and service pages
 - Responsive desktop and mobile layout
-- Customer registration and login
-- Customer portal: full request details, quoted amount, and online cancellation
-- Public quotation request form (prefilled for signed-in customers)
-- Email notification to the team for each new or cancelled request
+- Public quotation request form (no account needed)
+- Email to the team, and a confirmation email to the customer, for each new request
+- Admin-only login
 - Admin overview dashboard
 - Inquiry management: status, quoted amount and internal notes
 - Equipment and service catalogue management (add, edit, hide, show)
@@ -34,17 +33,17 @@ A responsive red, black and white website with a Node.js/MySQL backend, customer
 7. Run `npm start`.
 8. Open `http://localhost:3000`.
 
-The first startup creates the administrator account using `ADMIN_EMAIL` and `ADMIN_PASSWORD` from `.env`. Sign in using the Customer Login button; administrator accounts automatically open the dashboard.
+The first startup creates the administrator account using `ADMIN_EMAIL` and `ADMIN_PASSWORD` from `.env`. Sign in using the Admin Login button to open the dashboard. There are no customer accounts: customers only submit the quotation form.
 
 ## Email notifications
 
-The team is emailed when a customer submits or cancels a request. This is off until these are set in `.env`:
+When a customer submits a request, the team is emailed the full details and the customer is emailed a confirmation with their reference number. This is off until these are set in `.env`:
 
 - `BUSINESS_EMAIL` — the inbox that receives the notifications
 - `SMTP_HOST`, `SMTP_PORT` (587, or 465 for SSL), `SMTP_USER`, `SMTP_PASS` — from your email provider
 - `SMTP_FROM` — optional sender address; defaults to `SMTP_USER`
 
-Customers are not emailed. A failed email is logged and never blocks the request.
+Replies to the confirmation go to `BUSINESS_EMAIL`. A failed email is logged and never blocks the request. The quotation form accepts at most 10 submissions per 15 minutes from one device.
 
 ## Before public launch
 
@@ -64,9 +63,8 @@ This project is a working starter application, not yet a hosted live website. Be
 
 - Booking requests are inquiries, not confirmed reservations. An administrator must review availability and approve the request.
 - Equipment availability is not yet automatically blocked against overlapping bookings.
-- Payments, invoices, emails or SMS to customers, password reset and email verification are not yet integrated.
-- A request submitted while signed out is not attached to an account. Linking by email address is deliberately not done, because emails are not verified.
-- Customers can cancel a request online only while it is New, Reviewing or Quoted. Confirmed bookings must be cancelled through the team.
+- Payments, invoices, SMS, emailing the quote itself, password reset and email verification are not yet integrated.
+- Customers have no accounts and cannot track a request online; the team contacts them directly. There is one administrator account, created from `.env` on first start.
 - Image upload is restricted by MIME type and file size, but production deployment should add malware scanning and image processing.
 - Uploaded images are stored on local disk. For multiple server instances or managed production hosting, migrate them to object storage.
 - Add formal role-based staff accounts and audit logs before broad internal use.

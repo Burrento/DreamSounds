@@ -1,6 +1,6 @@
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
-const state = { token: localStorage.getItem("ds_token") || "", user: JSON.parse(localStorage.getItem("ds_user") || "null"), equipment: [], portfolio: [], authMode:"login" };
+const state = { token: localStorage.getItem("ds_token") || "", user: JSON.parse(localStorage.getItem("ds_user") || "null"), equipment: [], portfolio: [] };
 const api = async (url, options={}) => {
   const headers = {...(options.headers||{})};
   if (state.token) headers.Authorization = `Bearer ${state.token}`;
@@ -14,13 +14,7 @@ const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">
 const peso = n => "₱"+Number(n).toLocaleString("en-PH",{minimumFractionDigits:2});
 function setAuth(token,user){state.token=token;state.user=user;localStorage.setItem("ds_token",token);localStorage.setItem("ds_user",JSON.stringify(user));syncAuthUI();}
 function clearAuth(){state.token="";state.user=null;localStorage.removeItem("ds_token");localStorage.removeItem("ds_user");syncAuthUI();}
-// Signed-in customers get the quote form prefilled, so the request lands in their portal.
-function syncAuthUI(){
-  $("#loginOpen").textContent=state.user?(state.user.role==="admin"?"Admin Dashboard":"My Bookings"):"Customer Login";
-  if(!state.user||state.user.role==="admin")return;
-  const f=$("#quoteForm").elements;
-  for(const [field,value] of [["customer_name",state.user.name],["email",state.user.email],["phone",state.user.phone]]) if(!f[field].value) f[field].value=value||"";
-}
+function syncAuthUI(){$("#loginOpen").textContent=state.user?"Dashboard":"Admin Login";}
 function modal(id,open=true){const el=$("#"+id);el.classList.toggle("open",open);el.setAttribute("aria-hidden",String(!open));}
 function message(el,text,ok=false){el.textContent=text;el.style.color=ok?"#8fe0a0":"#ff626c";}
 $("#year").textContent=new Date().getFullYear();
@@ -51,51 +45,32 @@ $("#quoteForm").addEventListener("submit",async e=>{
   e.preventDefault();const form=e.currentTarget, data=Object.fromEntries(new FormData(form).entries());
   data.items=$$("#serviceChecks input:checked").map(x=>({id:Number(x.value),name:x.dataset.name}));
   $("#quoteMessage").textContent="Submitting your request…";
-  try{const result=await api("/api/bookings",{method:"POST",body:JSON.stringify(data)});message($("#quoteMessage"),`${result.message} Reference: ${result.reference}`,true);form.reset();syncAuthUI();}
+  try{const result=await api("/api/bookings",{method:"POST",body:JSON.stringify(data)});message($("#quoteMessage"),`${result.message} Reference: ${result.reference}`,true);form.reset();}
   catch(err){message($("#quoteMessage"),err.message);}
 });
 
-$("#loginOpen").addEventListener("click",()=>{
-  if(state.user){if(state.user.role==="admin")openAdmin();else openPortal();return;}
-  modal("authModal");
-});
-$$("[data-auth]").forEach(b=>b.addEventListener("click",()=>setAuthMode(b.dataset.auth)));
-function setAuthMode(mode){state.authMode=mode;$$("[data-auth]").forEach(b=>b.classList.toggle("active",b.dataset.auth===mode));$("#registerFields").hidden=mode!=="register";$("#authTitle").textContent=mode==="login"?"WELCOME BACK.":"CREATE YOUR ACCOUNT.";$("#authMessage").textContent="";}
+$("#loginOpen").addEventListener("click",()=>state.user?openAdmin():modal("authModal"));
 $("#authForm").addEventListener("submit",async e=>{
  e.preventDefault();const d=Object.fromEntries(new FormData(e.currentTarget).entries());
- try{const result=await api(`/api/auth/${state.authMode}`,{method:"POST",body:JSON.stringify(d)});setAuth(result.token,result.user);modal("authModal",false);if(result.user.role==="admin")openAdmin();else openPortal();}
+ try{const result=await api("/api/auth/login",{method:"POST",body:JSON.stringify(d)});setAuth(result.token,result.user);e.target.reset();modal("authModal",false);openAdmin();}
  catch(err){message($("#authMessage"),err.message);}
 });
-async function openPortal(){
- if(!state.user)return modal("authModal");
- $("#portalWelcome").textContent=`SIGNED IN AS ${state.user.name}`;
- modal("portalModal");
- await loadMyBookings();
-}
-async function loadMyBookings(){
- try{
-  const rows=await api("/api/bookings/mine");
-  $("#myBookings").innerHTML=rows.length?rows.map(b=>`<div class="booking-item"><strong>${esc(b.event_name)}</strong><small>${esc(b.reference)} • ${esc(b.event_date)} ${esc(b.event_time)} • ${esc(b.venue)}${b.guest_count?` • ${b.guest_count} guests`:""}</small><small>Requested: ${esc(b.items.map(x=>x.name).join(", ")||"Not specified")}</small>${b.notes?`<small>${esc(b.notes)}</small>`:""}<div class="booking-foot"><span class="status">${esc(b.status)}</span>${b.quoted_amount!=null?`<span class="status quote-amount">QUOTE: ${peso(b.quoted_amount)}</span>`:""}${["New","Reviewing","Quoted"].includes(b.status)?`<button class="outline-btn" data-cancel-booking="${b.id}">CANCEL REQUEST</button>`:""}</div></div>`).join(""):'<p class="muted">You have no bookings yet. Submit a quotation request to get started.</p>';
-  $$("[data-cancel-booking]").forEach(btn=>btn.addEventListener("click",async()=>{if(!confirm("Cancel this request?"))return;try{await api(`/api/bookings/${btn.dataset.cancelBooking}/cancel`,{method:"POST"});}catch(e){alert(e.message);}await loadMyBookings();}));
- }catch(e){$("#myBookings").innerHTML=`<p class="muted">${esc(e.message)}</p>`;}
-}
-$("#logoutBtn").addEventListener("click",()=>{clearAuth();modal("portalModal",false);});
 $("#adminLogout").addEventListener("click",()=>{clearAuth();modal("adminModal",false);});
 async function openAdmin(){
- if(!state.user||state.user.role!=="admin"){modal("authModal");return;}
+ if(!state.user){modal("authModal");return;}
  modal("adminModal");await refreshAdmin();
 }
 async function refreshAdmin(){
  try{
   const s=await api("/api/admin/overview");
-  $("#adminStats").innerHTML=[["INQUIRIES",s.inquiries],["NEW",s.newInquiries],["CUSTOMERS",s.customers],["EQUIPMENT",s.equipment],["PORTFOLIO",s.portfolio]].map(x=>`<div class="stat"><b>${x[1]}</b><small>${x[0]}</small></div>`).join("");
+  $("#adminStats").innerHTML=[["INQUIRIES",s.inquiries],["NEW",s.newInquiries],["EQUIPMENT",s.equipment],["PORTFOLIO",s.portfolio]].map(x=>`<div class="stat"><b>${x[1]}</b><small>${x[0]}</small></div>`).join("");
   await Promise.all([loadAdminBookings(),loadAdminEquipment(),loadAdminPortfolio()]);
  }catch(e){$("#panel-inquiries").innerHTML=`<p class="form-message">${esc(e.message)}</p>`;}
 }
 $$("[data-panel]").forEach(b=>b.addEventListener("click",()=>{ $$(".admin-tabs button").forEach(x=>x.classList.remove("active"));b.classList.add("active");$$(".admin-panel").forEach(p=>p.hidden=true);$("#panel-"+b.dataset.panel).hidden=false;}));
 async function loadAdminBookings(){
  const rows=await api("/api/admin/bookings");
- $("#panel-inquiries").innerHTML=rows.length?rows.map(b=>`<div class="admin-row"><div><strong>${esc(b.event_name)}</strong><small>DS-${String(b.id).padStart(5,"0")} • ${esc(b.customer_name)} • ${esc(b.email)} • ${esc(b.phone)}</small><small>${esc(b.event_date)} ${esc(b.event_time)} • ${esc(b.venue)} • ${b.guest_count||"Guest count n/a"} guests</small><small>Requested: ${esc((b.items||[]).map(x=>x.name).join(", ")||"Not specified")} ${esc(b.notes)}</small></div><form class="row-actions" data-booking="${b.id}"><select name="status" aria-label="Status">${["New","Reviewing","Quoted","Confirmed","Completed","Cancelled"].map(s=>`<option ${b.status===s?"selected":""}>${s}</option>`).join("")}</select><input name="quoted_amount" type="number" min="0" step=".01" placeholder="Quoted amount (PHP), shown to customer" aria-label="Quoted amount in pesos" value="${b.quoted_amount??""}"><input name="admin_notes" placeholder="Internal notes (staff only)" aria-label="Internal notes" value="${esc(b.admin_notes)}"><button class="outline-btn">SAVE</button></form></div>`).join(""):'<p class="muted">No inquiries have been received yet.</p>';
+ $("#panel-inquiries").innerHTML=rows.length?rows.map(b=>`<div class="admin-row"><div><strong>${esc(b.event_name)}</strong><small>DS-${String(b.id).padStart(5,"0")} • ${esc(b.customer_name)} • ${esc(b.email)} • ${esc(b.phone)}</small><small>${esc(b.event_date)} ${esc(b.event_time)} • ${esc(b.venue)} • ${b.guest_count||"Guest count n/a"} guests</small><small>Requested: ${esc((b.items||[]).map(x=>x.name).join(", ")||"Not specified")} ${esc(b.notes)}</small></div><form class="row-actions" data-booking="${b.id}"><select name="status" aria-label="Status">${["New","Reviewing","Quoted","Confirmed","Completed","Cancelled"].map(s=>`<option ${b.status===s?"selected":""}>${s}</option>`).join("")}</select><input name="quoted_amount" type="number" min="0" step=".01" placeholder="Quoted amount (PHP)" aria-label="Quoted amount in pesos" value="${b.quoted_amount??""}"><input name="admin_notes" placeholder="Notes" aria-label="Internal notes" value="${esc(b.admin_notes)}"><button class="outline-btn">SAVE</button></form></div>`).join(""):'<p class="muted">No inquiries have been received yet.</p>';
  const save=async(form,body)=>{try{await api(`/api/admin/bookings/${form.dataset.booking}`,{method:"PATCH",body:JSON.stringify(body)});return true;}catch(e){alert(e.message);return false;}};
  $$("[data-booking]").forEach(form=>{
   form.elements.status.addEventListener("change",()=>save(form,{status:form.elements.status.value}));
@@ -124,7 +99,7 @@ async function loadAdminPortfolio(){
  $("#uploadForm").addEventListener("submit",async e=>{e.preventDefault();const form=e.currentTarget,fd=new FormData(form);try{const r=await api("/api/admin/portfolio",{method:"POST",body:fd});message($("#uploadMessage"),r.message,true);form.reset();await loadAdminPortfolio();await loadPortfolio();await refreshAdminStatsOnly();}catch(err){message($("#uploadMessage"),err.message);}});
  $$("[data-delete-photo]").forEach(b=>b.addEventListener("click",async()=>{if(confirm("Delete this portfolio image?")){await api(`/api/admin/portfolio/${b.dataset.deletePhoto}`,{method:"DELETE"});await loadAdminPortfolio();await loadPortfolio();}}));
 }
-async function refreshAdminStatsOnly(){const s=await api("/api/admin/overview");$("#adminStats").innerHTML=[["INQUIRIES",s.inquiries],["NEW",s.newInquiries],["CUSTOMERS",s.customers],["EQUIPMENT",s.equipment],["PORTFOLIO",s.portfolio]].map(x=>`<div class="stat"><b>${x[1]}</b><small>${x[0]}</small></div>`).join("");}
+async function refreshAdminStatsOnly(){const s=await api("/api/admin/overview");$("#adminStats").innerHTML=[["INQUIRIES",s.inquiries],["NEW",s.newInquiries],["EQUIPMENT",s.equipment],["PORTFOLIO",s.portfolio]].map(x=>`<div class="stat"><b>${x[1]}</b><small>${x[0]}</small></div>`).join("");}
 async function init(){
  await Promise.all([loadEquipment(),loadPortfolio()]);
  if(state.token){try{const r=await api("/api/auth/me");state.user=r.user;localStorage.setItem("ds_user",JSON.stringify(r.user));}catch{clearAuth();}}
