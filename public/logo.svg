@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Dream Sounds Audio &amp; Lights Rentals">
+  <defs>
+    <clipPath id="disc"><circle cx="512" cy="512" r="500"/></clipPath>
+    <linearGradient id="redBand" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e01414"/>
+      <stop offset="1" stop-color="#a80000"/>
+    </linearGradient>
+    <linearGradient id="redS" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff3b3b"/>
+      <stop offset="0.5" stop-color="#d40000"/>
+      <stop offset="1" stop-color="#8f0000"/>
+    </linearGradient>
+    <radialGradient id="inner" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#2a0505"/>
+      <stop offset="1" stop-color="#050505"/>
+    </radialGradient>
+    <polygon id="star" fill="#d61a1a" stroke="#ff5a5a" stroke-width="2" stroke-linejoin="round"
+      points="0,-62 15.3,-21 59,-19.2 24.7,8 36.4,50.2 0,26 -36.4,50.2 -24.7,8 -59,-19.2 -15.3,-21"/>
+    <path id="topArc" d="M125 512 A387 387 0 0 1 899 512"/>
+    <path id="botArc" d="M47 512 A465 465 0 0 0 977 512"/>
+    <path id="S" d="M700 290 H430 C350 290 315 330 315 375 C315 425 350 455 420 455 H590 C660 455 700 480 700 530 C700 590 650 650 580 655 H390"/>
+    <path id="D" d="M325 480 V745 H545 C705 745 795 650 795 525 C795 405 705 330 560 330"/>
+  </defs>
+
+  <!-- badge -->
+  <circle cx="512" cy="512" r="512" fill="#000"/>
+  <g clip-path="url(#disc)">
+    <rect width="1024" height="425" fill="url(#redBand)"/>
+    <rect y="425" width="1024" height="599" fill="#0b0b0b"/>
+    <rect y="420" width="1024" height="5" fill="#e01818"/>
+    <rect y="620" width="1024" height="4" fill="#c01010"/>
+  </g>
+  <circle cx="512" cy="512" r="496" fill="none" stroke="#5a0000" stroke-width="3"/>
+
+  <!-- stars -->
+  <use href="#star" x="80" y="510"/>
+  <use href="#star" x="945" y="510"/>
+
+  <!-- inner medallion -->
+  <circle cx="512" cy="512" r="360" fill="#000"/>
+  <circle cx="512" cy="512" r="345" fill="url(#inner)" stroke="#e01818" stroke-width="7"/>
+  <circle cx="512" cy="512" r="328" fill="none" stroke="#6e0000" stroke-width="3"/>
+
+  <!-- SD monogram -->
+  <g fill="none" stroke-linecap="butt" stroke-linejoin="round">
+    <use href="#D" stroke="#ff2a2a" stroke-width="78"/>
+    <use href="#D" stroke="#000" stroke-width="68"/>
+    <use href="#D" stroke="url(#redS)" stroke-width="54"/>
+    <use href="#S" stroke="#ff2a2a" stroke-width="78"/>
+    <use href="#S" stroke="#000" stroke-width="68"/>
+    <use href="#S" stroke="url(#redS)" stroke-width="54"/>
+  </g>
+
+  <!-- lettering -->
+  <g font-family="Georgia, 'Times New Roman', serif" font-weight="900" fill="#f6f6f6"
+     stroke="#3a0000" stroke-width="2" paint-order="stroke">
+    <text font-size="150" text-anchor="middle">
+      <textPath href="#topArc" startOffset="50%" textLength="890" lengthAdjust="spacingAndGlyphs">DREAM SOUNDS</textPath>
+    </text>
+    <text font-size="88" text-anchor="middle">
+      <textPath href="#botArc" startOffset="50%" textLength="1150" lengthAdjust="spacingAndGlyphs">AUDIO &amp; LIGHTS RENTALS</textPath>
+    </text>
+  </g>
+</svg>
