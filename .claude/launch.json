@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dreamsounds",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["server.js"],
+      "port": 3000
+    },
+    {
+      "name": "dreamsounds-test",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "set DB_NAME=dreamsounds_smoketest&& set PORT=3111&& set SMTP_HOST=127.0.0.1&& set SMTP_PORT=9&& set BUSINESS_EMAIL=team@example.com&& node server.js"],
+      "port": 3111
+    }
+  ]
+}
